@@ -1,11 +1,15 @@
 package tech.favs.ebs
 
-import tech.favs.ebs.model.*
+import tech.favs.ebs.model.Deeplink
+import tech.favs.ebs.model.DeeplinkGenerator
+import tech.favs.ebs.model.ProductInformation
+import tech.favs.ebs.model.ProductInformationExtractor
 import tech.favs.ebs.tradingplatforms.yamandberu.BeruDeeplinkGenerator
 import tech.favs.ebs.tradingplatforms.yamandberu.BeruProductInformationExtractor
 import tech.favs.ebs.tradingplatforms.yamandberu.YAMDeeplinkGenerator
 import tech.favs.ebs.tradingplatforms.yamandberu.YAMProductInformationExtractor
 import tech.favs.ebs.util.ApplicationProperty
+import tech.favs.ebs.util.OperationListResult
 import tech.favs.ebs.util.OperationValueResult
 
 private val HOST_REGEXP = "https?://(.*?)/.*".toRegex()
@@ -28,11 +32,11 @@ enum class TradingPlatform(private val host: String, val deeplinkGenerator: Deep
 }
 
 class GeneralDeeplinkGenerator : DeeplinkGenerator {
-    override fun generate(streamerId: Int, urls: List<String>): OperationValueResult<out List<Deeplink>> {
-        return OperationValueResult.groupByCatching(urls) { url ->
-            TradingPlatform.values().find { it.test(url) } ?: throw UnknownTradingPlatformException(url)
-        }.flatMap { urlGroups ->
-            OperationValueResult.flatMapWithLift2(urlGroups.entries.toList()) { (tradingPlatform, platformUrls) ->
+    override fun generate(streamerId: Int, urls: List<String>): OperationListResult<String, out Deeplink> {
+        return OperationListResult.fromList(urls) { url ->
+            OperationValueResult.fromNullable(TradingPlatform.values().find { it.test(url) }, "Адрес данного магазина не поддерживается или введен неверно")
+        }.flatMapLift2 { tradingPlatformList ->
+            tradingPlatformList.groupBy({ it.second }) { it.first }.map { (tradingPlatform, platformUrls) ->
                 tradingPlatform.deeplinkGenerator.generate(streamerId, platformUrls)
             }
         }
@@ -40,11 +44,11 @@ class GeneralDeeplinkGenerator : DeeplinkGenerator {
 }
 
 class GeneralProductInformationExtractor : ProductInformationExtractor {
-    override fun extract(urls: List<String>): OperationValueResult<out List<ProductInformation>> {
-        return OperationValueResult.groupByCatching(urls) { url ->
-            TradingPlatform.values().find { it.test(url) } ?: throw UnknownTradingPlatformException(url)
-        }.flatMap { urlGroups ->
-            OperationValueResult.flatMapWithLift2(urlGroups.entries.toList()) { (tradingPlatform, platformUrls) ->
+    override fun extract(urls: List<String>): OperationListResult<String, out ProductInformation> {
+        return OperationListResult.fromList(urls) { url ->
+            OperationValueResult.fromNullable(TradingPlatform.values().find { it.test(url) }, "Адрес данного магазина не поддерживается или введен неверно")
+        }.flatMapLift2 { tradingPlatformList ->
+            tradingPlatformList.groupBy({ it.second }) { it.first }.map { (tradingPlatform, platformUrls) ->
                 tradingPlatform.productInformationExtractor.extract(platformUrls)
             }
         }

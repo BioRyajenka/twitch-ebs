@@ -9,6 +9,7 @@ private const val MAX_URL_LENGTH = 300
 
 object Deeplinks : IntIdTable() {
     val streamerId = integer("streamer_id")
+    // TODO if I store url as is, sql injection may take place
     val url = varchar("url", MAX_URL_LENGTH)
     val subId = integer("sub_id")
     val deeplink = varchar("deeplink", MAX_URL_LENGTH)
@@ -21,7 +22,6 @@ object Deeplinks : IntIdTable() {
 class DeeplinkDao(id: EntityID<Int>) : IntEntity(id) {
     companion object : IntEntityClass<DeeplinkDao>(Deeplinks)
 
-    val streamerId by Deeplinks.streamerId
     val url by Deeplinks.url
     val subId by Deeplinks.subId
 }

@@ -2,35 +2,20 @@ package tech.favs.ebs.util
 
 class OperationValueResult<V> private constructor(
         @PublishedApi internal val result: V?,
-        @PublishedApi internal val errors: List<Throwable>?
+        @PublishedApi internal val error: String?
 ) {
     companion object {
-        private fun <T, R : Any> mapWithErrors(list: List<T>, transform: (T) -> R): Pair<List<R>, List<Throwable>> {
-            val errors = mutableListOf<Throwable>()
-
-            val result = list.mapNotNull {
-                try {
-                    transform(it)
-                } catch (e: Throwable) {
-                    errors += e
-                    null
-                }
-            }
-
-            return result to errors
-        }
-
-        fun <T, R : Any> mapCatching(list: List<T>, transform: (T) -> R): OperationValueResult<List<R>> {
+        /*fun <T, R : Any> mapCatching(list: List<T>, transform: (T) -> R): OperationValueResult<List<R>> {
             val (result, errors) = mapWithErrors(list, transform)
 
             return if (errors.isNotEmpty()) {
-                OperationValueResult(null, errors)
+                OperationValueResult(null, error)
             } else {
                 OperationValueResult(result, null)
             }
-        }
+        }*/
 
-        fun <T, R : Any> groupByCatching(list: List<T>, transform: (T) -> R): OperationValueResult<Map<R, List<T>>> {
+        /*fun <T, R : Any> groupByCatching(list: List<T>, transform: (T) -> R): OperationValueResult<Map<R, List<T>>> {
             val (result, errors) = mapWithErrors(list) {
                 it to transform(it)
             }
@@ -71,9 +56,13 @@ class OperationValueResult<V> private constructor(
             return flatMapWithLift(list, transform) { value ->
                 value.map { it.result!! }
             }
-        }
+        }*/
 
         fun <V> success(result: V) = OperationValueResult(result, null)
+
+        fun <V> failure(error: String) = OperationValueResult<V>(null, error)
+
+        fun <V> fromNullable(result: V?, error: String) = result?.let { success(it) } ?: failure(error)
     }
 
     val isSuccess
@@ -87,34 +76,83 @@ class OperationValueResult<V> private constructor(
         return this
     }
 
-    inline fun ifFailure(action: (List<Throwable>) -> Unit): OperationValueResult<V> {
-        if (isFailure) action(errors!!)
+    inline fun ifFailure(action: (String) -> Unit): OperationValueResult<V> {
+        if (isFailure) action(error!!)
         return this
     }
 
-    inline fun <R> fold(successAction: (V) -> R, failureAction: (List<Throwable>) -> R): R {
+    inline fun <R> fold(successAction: (V) -> R, failureAction: (String) -> R): R {
         return when {
             isSuccess -> successAction(result!!)
-            else -> failureAction(errors!!)
+            else -> failureAction(error!!)
         }
     }
 
     fun <R> map(transform: (V) -> R): OperationValueResult<out R> {
         return when {
-            isSuccess -> try {
-                success(transform(result!!))
-            } catch (e: Throwable) {
-                val newErrors = (errors ?: mutableListOf()) + e
-                OperationValueResult(null, newErrors)
-            }
-            else -> OperationValueResult(null, errors)
+            isSuccess -> success(transform(result!!))
+            else -> failure(error!!)
         }
     }
 
     fun <R> flatMap(transform: (V) -> OperationValueResult<out R>): OperationValueResult<out R> {
         return when {
             isSuccess -> transform(result!!)
-            else -> OperationValueResult(null, errors)
+            else -> failure(error!!)
         }
+    }
+}
+
+class OperationListResult<V, R> private constructor(val data: List<Pair<V, OperationValueResult<out R>>>) {
+
+    companion object {
+        public fun <T, R : Any> fromList(list: List<T>, transform: (T) -> OperationValueResult<out R>): OperationListResult<T, R> {
+            return fromListWithSpecificKey(list) { it to transform(it) }
+        }
+
+        public fun <T, K, R : Any> fromListWithSpecificKey(list: List<T>, transform: (T) -> Pair<K, OperationValueResult<out R>>): OperationListResult<K, R> {
+            return OperationListResult(list.map(transform))
+        }
+
+    }
+
+    private fun <R2, Z> flatMapLift(transform: (List<Pair<V, R>>) -> Z, unpack: (Z) -> OperationListResult<V, out R2>): OperationListResult<V, out R2> {
+        val (successes, failures) = data.splitBy { it.second.isSuccess }
+        val filteredData = successes.map { (k, v) ->
+            k to v.result!!
+        }
+
+        val resultData = unpack(transform(filteredData)).data
+        val oldFailures = failures.map { (k, v) ->
+            k to OperationValueResult.failure<R2>(v.error!!)
+        }
+
+        return OperationListResult(oldFailures + resultData)
+    }
+
+    fun <R2> flatMap(transform: (List<Pair<V, R>>) -> OperationListResult<V, out R2>): OperationListResult<V, out R2> {
+        return flatMapLift(transform) { it }
+    }
+
+    fun <R2> flatMapLift2(transform: (List<Pair<V, R>>) -> List<OperationListResult<V, out R2>>): OperationListResult<V, out R2> {
+        return flatMapLift(transform) { resultList: List<OperationListResult<V, out R2>> ->
+            OperationListResult(resultList.flatMap { it.data })
+        }
+    }
+
+    fun <R2> zip(rhs: OperationListResult<V, out R2>): OperationListResult<V, Pair<R, R2>> {
+        return zip(rhs) { v1, v2 -> v1 to v2 }
+    }
+
+    fun <R2, R3> zip(rhs: OperationListResult<V, out R2>, transform: (R, R2) -> R3): OperationListResult<V, R3> {
+        val rhsMap = rhs.data.toMap()
+        val newData = data.map { (k, v) ->
+            val rhsR = rhsMap[k] ?: error("Can't zip operation list results with different key sets")
+            val res = v.flatMap { v1 ->
+                rhsR.map { v2 -> transform(v1, v2) }
+            }
+            k to res
+        }
+        return OperationListResult(newData)
     }
 }

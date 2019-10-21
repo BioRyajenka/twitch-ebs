@@ -4,24 +4,32 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.transactions.transaction
 import tech.favs.ebs.dao.DeeplinkDao
 import tech.favs.ebs.dao.Deeplinks
 import tech.favs.ebs.model.Deeplink
 import tech.favs.ebs.model.DeeplinkGenerator
+import tech.favs.ebs.util.OperationListResult
 import tech.favs.ebs.util.OperationValueResult
 
+// TODO: also save it somewhere
 private fun generateSubId(streamerId: Int, url: String): Int {
-    val count = Deeplinks.select {
-        Deeplinks.streamerId eq streamerId and (Deeplinks.url eq url)
-    }.count()
-    if (count == 1) return count // already present
+    // TODO: suspiciously same code. think about refactor
+    val existentSubId = transaction {
+        DeeplinkDao.wrapRows(Deeplinks.select {
+            Deeplinks.streamerId eq streamerId and (Deeplinks.url eq url)
+        }).toList().let {
+            check(it.size <= 1)
+            it.singleOrNull()?.subId
+        }
+    }
+    if (existentSubId != null) return existentSubId // already present
 
-    val highest = DeeplinkDao.wrapRows(
-            Deeplinks.slice(Deeplinks.subId.max())
-                    .select(Deeplinks.url eq url)
-    ).toList().let {
-        check(it.size <= 1)
-        it.singleOrNull()?.subId ?: -1
+    val highest = transaction {
+        val maxIdExpression = Deeplinks.subId.max()
+        Deeplinks.slice(maxIdExpression)
+                .select(Deeplinks.url eq url)
+                .single()[maxIdExpression] ?: -1
     }
     if (highest == 999) {
         error("According to YAM API, vid should be less than 1000. " +
@@ -33,11 +41,11 @@ private fun generateSubId(streamerId: Int, url: String): Int {
 abstract class YandexDeeplinkGenerator(private val clid: Int) : DeeplinkGenerator {
     protected abstract val fixedPart: String
 
-    override fun generate(streamerId: Int, urls: List<String>): OperationValueResult<List<Deeplink>> {
-        return OperationValueResult.mapCatching(urls) { url ->
+    override fun generate(streamerId: Int, urls: List<String>): OperationListResult<String, Deeplink> {
+        return OperationListResult.fromList(urls) { url ->
             val subId = generateSubId(streamerId, url)
             val deeplink = "$url?$fixedPart&clid=$clid&vid=$subId"
-            Deeplink(url, deeplink)
+            OperationValueResult.success(Deeplink(url, deeplink))
         }
     }
 }
