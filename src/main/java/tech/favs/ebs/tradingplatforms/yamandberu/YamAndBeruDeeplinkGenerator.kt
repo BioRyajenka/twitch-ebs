@@ -1,41 +1,34 @@
 package tech.favs.ebs.tradingplatforms.yamandberu
 
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
-import tech.favs.ebs.dao.DeeplinkDao
 import tech.favs.ebs.dao.Deeplinks
 import tech.favs.ebs.model.Deeplink
 import tech.favs.ebs.model.DeeplinkGenerator
 import tech.favs.ebs.util.OperationListResult
 import tech.favs.ebs.util.OperationValueResult
 
-// TODO: also save it somewhere
+@Suppress("FunctionName")
+private fun `select max subId by url`(url: String): Int = transaction {
+    val maxIdExpression = Deeplinks.subId.max()
+    Deeplinks.slice(maxIdExpression)
+            .select(Deeplinks.url eq url)
+            .single()[maxIdExpression] ?: -1
+}
+
+// it is related to YAM and BERU only
 private fun generateSubId(streamerId: Int, url: String): Int {
-    // TODO: suspiciously same code. think about refactor
-    val existentSubId = transaction {
-        DeeplinkDao.wrapRows(Deeplinks.select {
-            Deeplinks.streamerId eq streamerId and (Deeplinks.url eq url)
-        }).toList().let {
-            check(it.size <= 1)
-            it.singleOrNull()?.subId
-        }
-    }
+    val existentSubId = Deeplinks.selectByStreamerIdAndUrl(streamerId, url)?.subId
     if (existentSubId != null) return existentSubId // already present
 
-    val highest = transaction {
-        val maxIdExpression = Deeplinks.subId.max()
-        Deeplinks.slice(maxIdExpression)
-                .select(Deeplinks.url eq url)
-                .single()[maxIdExpression] ?: -1
-    }
-    if (highest == 999) {
-        error("According to YAM API, vid should be less than 1000. " +
+    val highestSubId = `select max subId by url`(url)
+    if (highestSubId == 999) {
+        error("According to YAM API, \"vid\" should be less than 1000. " +
                 "https://yandex.ru/support/market-distr/partner-links/partner-links-template.html#partners-links-template")
     }
-    return highest + 1
+    return highestSubId + 1
 }
 
 abstract class YandexDeeplinkGenerator(private val clid: Int) : DeeplinkGenerator {
@@ -45,7 +38,7 @@ abstract class YandexDeeplinkGenerator(private val clid: Int) : DeeplinkGenerato
         return OperationListResult.fromList(urls) { url ->
             val subId = generateSubId(streamerId, url)
             val deeplink = "$url?$fixedPart&clid=$clid&vid=$subId"
-            OperationValueResult.success(Deeplink(url, deeplink))
+            OperationValueResult.success(Deeplink(url, deeplink, subId, streamerId))
         }
     }
 }

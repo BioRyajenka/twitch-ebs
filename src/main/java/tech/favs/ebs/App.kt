@@ -19,12 +19,14 @@ import tech.favs.ebs.dao.Deeplinks
 import tech.favs.ebs.routes.processRoutes
 import tech.favs.ebs.routes.userRoutes
 
+private const val DB_NAME = "dev.db"
+
 val objectMapper = jacksonObjectMapper().apply {
     configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 }
 
-fun initDb() {
-    Database.connect("jdbc:sqlite:test.db", driver = "org.sqlite.JDBC")
+fun initDb(dbName: String) {
+    Database.connect("jdbc:sqlite:$dbName", driver = "org.sqlite.JDBC")
     transaction {
         SchemaUtils.createMissingTablesAndColumns(Deeplinks)
     }
@@ -34,7 +36,7 @@ class App : CliktCommand() {
     private val port: Int by option(help = "EBS port").int().default(8080)
 
     override fun run() {
-        initDb()
+        initDb(DB_NAME)
 
         embeddedServer(Netty, port) {
             install(CORS) {

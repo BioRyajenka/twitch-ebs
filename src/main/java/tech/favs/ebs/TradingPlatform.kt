@@ -19,7 +19,9 @@ private val yamWidgetClid by ApplicationProperty<Int>("tp.yam.widget-clid")
 private val beruDeeplinkClid by ApplicationProperty<Int>("tp.beru.deeplink-clid")
 private val beruWidgetClid by ApplicationProperty<Int>("tp.beru.widget-clid")
 
-enum class TradingPlatform(private val host: String, val deeplinkGenerator: DeeplinkGenerator, val productInformationExtractor: ProductInformationExtractor) {
+enum class TradingPlatform(private val host: String,
+                           val deeplinkGenerator: DeeplinkGenerator,
+                           val productInformationExtractor: ProductInformationExtractor) {
     YAM("market.yandex.ru", YAMDeeplinkGenerator(yamDeeplinkClid), YAMProductInformationExtractor(yamWidgetClid)),
     BERU("beru.ru", BeruDeeplinkGenerator(beruDeeplinkClid), BeruProductInformationExtractor(beruWidgetClid));
 

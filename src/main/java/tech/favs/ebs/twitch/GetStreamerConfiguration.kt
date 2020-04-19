@@ -9,10 +9,10 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
 
-val JWT_SECRET = Base64.getDecoder().decode("cR0N9qhMNok3ACgjwslvAo+A84HJzYsTRFwrNE8ObHU=")
+private val JWT_SECRET = Base64.getDecoder().decode("cR0N9qhMNok3ACgjwslvAo+A84HJzYsTRFwrNE8ObHU=")
 
 @Suppress("UNCHECKED_CAST")
-fun JWTCreator.Builder.withClaimUnsafe(name: String, obj: Any): JWTCreator.Builder {
+private fun JWTCreator.Builder.withClaimUnsafe(name: String, obj: Any): JWTCreator.Builder {
     val field = JWTCreator.Builder::class.java.getDeclaredField("payloadClaims")
     field.isAccessible = true
     val payloadClaims = field.get(this) as MutableMap<String, Any>
@@ -20,7 +20,7 @@ fun JWTCreator.Builder.withClaimUnsafe(name: String, obj: Any): JWTCreator.Build
     return this
 }
 
-fun createJWT(userId: String): String {
+private fun createJWT(userId: String): String {
     return JWT.create()
             .withClaim("exp", Date.from(LocalDateTime.now().plusMinutes(3).toInstant(ZoneOffset.UTC)))
             .withClaim("user_id", userId)
@@ -52,6 +52,7 @@ fun getBroadcasterConfiguration(extensionId: String, userId: String): JSONArray 
 }
 
 fun main() {
+    // new api key is 1u611hgop22tuakn0f0xgntptgs3qb
     val CLIENT_ID = "azmhg8jirkn1v77txbk9fspqsorqd8"
     val userId = "218603102"
 

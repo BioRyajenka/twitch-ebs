@@ -10,6 +10,7 @@ import io.ktor.routing.get
 import org.json.JSONObject
 import tech.favs.ebs.GeneralDeeplinkGenerator
 import tech.favs.ebs.GeneralProductInformationExtractor
+import tech.favs.ebs.dao.Deeplinks
 import tech.favs.ebs.util.ApplicationProperty
 
 private val maxUrlsInRequest by ApplicationProperty<Int>("request.max-urls")
@@ -37,6 +38,13 @@ fun Route.processRoutes() {
             val deeplinks = deeplinkGenerator.generate(streamerId.toInt(), urls)
             val productInfos = productInformationExtractor.extract(urls)
             val result = deeplinks.zip(productInfos)
+
+            // save to db before answer
+            deeplinks.data.forEach { (_, deeplink) ->
+                deeplink.ifSuccess {
+                    Deeplinks.insertOrUpdateDeeplink(it)
+                }
+            }
 
             val resultJson = JSONObject()
             result.data.forEach { (originalUrl, originalUrlResult) ->

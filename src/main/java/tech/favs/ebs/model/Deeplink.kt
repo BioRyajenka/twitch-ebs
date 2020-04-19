@@ -6,4 +6,4 @@ interface DeeplinkGenerator {
     fun generate(streamerId: Int, urls: List<String>): OperationListResult<String, out Deeplink>
 }
 
-data class Deeplink(val originalUrl: String, val deeplink: String)
+data class Deeplink(val originalUrl: String, val deeplink: String, val subId: Int, val streamerId: Int)

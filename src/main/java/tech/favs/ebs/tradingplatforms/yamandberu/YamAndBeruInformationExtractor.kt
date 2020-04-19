@@ -10,6 +10,7 @@ import tech.favs.ebs.util.OperationValueResult
 import java.text.DecimalFormat
 import java.text.NumberFormat
 import java.util.*
+import java.util.Collections.singletonList
 
 /*
  * https://market.yandex.ru/product--artesia-pa-88w/13016017
@@ -110,16 +111,19 @@ class BeruProductInformationExtractor(widgetClid: Int) : YandexProductInformatio
     }
 
     override fun getProductsInfo(productIds: List<Pair<String, ProductId>>): OperationListResult<String, ProductInformation> {
-        val r = get("https://aflt.market.yandex.ru/widget/multi/api/initByType/beruOffers",
-                params = mapOf(
-                        "searchSkuIds" to productIds.map { it.second }.joinToString(","),
-                        "clid" to widgetClid.toString(),
-                        "themeId" to "2",
-                        "rotateBeruToMarket" to "false"
-                ))
-        println(r.request.url)
-        val modelIds = convertSkuIdsToModelIds(r.jsonObject, productIds)
-        return parseResponseJson(modelIds, r.jsonObject)
+        val responses = productIds.map { productId ->
+            val r = get("https://aflt.market.yandex.ru/widget/multi/api/initByType/beruOffers",
+                    params = mapOf(
+                            "searchSkuIds" to productId.second.toString(),
+                            "clid" to widgetClid.toString(),
+                            "themeId" to "2",
+                            "rotateBeruToMarket" to "false"
+                    ))
+            println(r.request.url)
+            val modelIds = convertSkuIdsToModelIds(r.jsonObject, singletonList(productId))
+            parseResponseJson(modelIds, r.jsonObject).data.single()
+        }
+        return OperationListResult.fromListWithSpecificKey(responses) { it }
     }
 }
 
