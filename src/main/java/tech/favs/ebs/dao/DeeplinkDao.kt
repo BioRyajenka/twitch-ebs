@@ -11,7 +11,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import tech.favs.ebs.model.Deeplink
 
-private const val MAX_URL_LENGTH = 300
+private const val MAX_URL_LENGTH = 3000
 
 object Deeplinks : IntIdTable() {
     val streamerId = integer("streamer_id")

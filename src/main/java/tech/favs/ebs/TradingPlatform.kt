@@ -4,6 +4,8 @@ import tech.favs.ebs.model.Deeplink
 import tech.favs.ebs.model.DeeplinkGenerator
 import tech.favs.ebs.model.ProductInformation
 import tech.favs.ebs.model.ProductInformationExtractor
+import tech.favs.ebs.tradingplatforms.amazon.AmazonDeeplinkGenerator
+import tech.favs.ebs.tradingplatforms.amazon.AmazonInformationExtractor
 import tech.favs.ebs.tradingplatforms.yamandberu.BeruDeeplinkGenerator
 import tech.favs.ebs.tradingplatforms.yamandberu.BeruProductInformationExtractor
 import tech.favs.ebs.tradingplatforms.yamandberu.YAMDeeplinkGenerator
@@ -23,7 +25,8 @@ enum class TradingPlatform(private val host: String,
                            val deeplinkGenerator: DeeplinkGenerator,
                            val productInformationExtractor: ProductInformationExtractor) {
     YAM("market.yandex.ru", YAMDeeplinkGenerator(yamDeeplinkClid), YAMProductInformationExtractor(yamWidgetClid)),
-    BERU("beru.ru", BeruDeeplinkGenerator(beruDeeplinkClid), BeruProductInformationExtractor(beruWidgetClid));
+    BERU("beru.ru", BeruDeeplinkGenerator(beruDeeplinkClid), BeruProductInformationExtractor(beruWidgetClid)),
+    AMAZON("amazon.com", AmazonDeeplinkGenerator(), AmazonInformationExtractor());
 
     fun test(url: String): Boolean {
         val mr = HOST_REGEXP.find(url)
